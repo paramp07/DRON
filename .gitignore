@@ -89,3 +89,13 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /DRON_Interface/[Aa]ssets/[Ss]treamingAssets/aa.meta
 /DRON_Interface/[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.env
+.venv
+env/
+venv/

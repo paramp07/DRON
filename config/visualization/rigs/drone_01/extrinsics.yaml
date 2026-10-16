@@ -1,0 +1,30 @@
+%YAML:1.0
+rig_id: drone_01_multimodal_rig
+calibration_id: calib_20261016_drone01_v1
+
+# Stereo baseline: ~80mm along X
+stereo:
+  rotation: !!opencv-matrix
+     rows: 3
+     cols: 3
+     dt: d
+     data: [ 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
+  translation: !!opencv-matrix
+     rows: 3
+     cols: 1
+     dt: d
+     data: [ -0.080, 0.0, 0.0 ]
+
+# Rigid body transform from Left Optical Frame to Thermal Optical Frame
+# p_thermal = R_thermal_left * p_left + T_thermal_left
+thermal_from_left:
+  rotation: !!opencv-matrix
+     rows: 3
+     cols: 3
+     dt: d
+     data: [ 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 ]
+  translation: !!opencv-matrix
+     rows: 3
+     cols: 1
+     dt: d
+     data: [ -0.040, -0.025, 0.005 ] # 40mm left, 25mm up, 5mm forward offset

@@ -1,0 +1,8 @@
+# Request complete map snapshot for late-joining Unity clients
+string session_id
+---
+bool success
+string message
+uint64 revision
+dron_interfaces/ThermalChunk[] chunks
+dron_interfaces/PoseGraphUpdate pose_graph

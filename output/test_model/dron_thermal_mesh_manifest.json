@@ -1,0 +1,19 @@
+{
+  "model_name": "dron_thermal_mesh",
+  "session_id": "session_001",
+  "vertex_count": 4,
+  "face_count": 2,
+  "units": {
+    "spatial": "meters",
+    "temperature": "celsius"
+  },
+  "stats": {
+    "min_temp_c": 24.5,
+    "max_temp_c": 85.30000305175781,
+    "mean_temp_c": 54.22500228881836
+  },
+  "files": {
+    "geometry": "dron_thermal_mesh.ply",
+    "sidecar": "dron_thermal_mesh_thermal.npz"
+  }
+}

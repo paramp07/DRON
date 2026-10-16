@@ -1,0 +1,21 @@
+rig_id: drone_01
+calibration_date: "2026-10-16"
+sensors:
+  left_camera:
+    type: picam2
+    serial: "cam0_imx708"
+    config: "left.yaml"
+  right_camera:
+    type: picam2
+    serial: "cam1_imx708"
+    config: "right.yaml"
+  thermal_camera:
+    type: senxor_mi48
+    serial: "mi48_usb_01"
+    config: "thermal.yaml"
+extrinsics: "extrinsics.yaml"
+validation_residuals:
+  stereo_epipolar_median_px: 0.32
+  stereo_epipolar_p95_px: 0.68
+  thermal_reprojection_median_px: 0.54
+  thermal_reprojection_p95_px: 1.12

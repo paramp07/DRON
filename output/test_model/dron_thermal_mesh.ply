@@ -1,0 +1,17 @@
+ply
+format ascii 1.0
+element vertex 4
+property float x
+property float y
+property float z
+property float temperature_c
+property float confidence
+element face 2
+property list uchar int vertex_indices
+end_header
+-1.0000 -1.0000 2.0000 24.50 0.950
+1.0000 -1.0000 2.0000 82.00 0.980
+1.0000 1.0000 2.0000 85.30 0.970
+-1.0000 1.0000 2.0000 25.10 0.920
+3 0 1 2
+3 0 2 3

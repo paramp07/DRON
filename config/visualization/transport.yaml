@@ -1,0 +1,22 @@
+# ROS 2 & Unity Transport Configuration
+network:
+  ros_domain_id: 42
+  compression: "none" # "none" or "turbojpeg"
+
+ros_topics:
+  stereo_left_image: "/drone_01/stereo/left/image_raw"
+  stereo_right_image: "/drone_01/stereo/right/image_raw"
+  stereo_left_info: "/drone_01/stereo/left/camera_info"
+  stereo_right_info: "/drone_01/stereo/right/camera_info"
+  thermal_image: "/drone_01/thermal/image_temperature"
+  thermal_info: "/drone_01/thermal/camera_info"
+  thermal_chunk: "/drone_01/mapping/keyframe_chunk"
+  pose_graph: "/drone_01/mapping/pose_graph"
+  mapping_status: "/drone_01/mapping/status"
+  preview_cloud: "/drone_01/thermal/points_preview"
+
+unity_bridge:
+  protocol: "ros_tcp_endpoint" # "ros_tcp_endpoint" or "native_dds"
+  tcp_ip: "127.0.0.1"
+  tcp_port: 10000
+  buffer_capacity_points: 500000
