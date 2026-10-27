@@ -38,14 +38,20 @@ class StreamWorker:
         while self.running:
             if not self.cap.isOpened():
                 time.sleep(0.1)
-                self.cap = cv2.VideoCapture(self.url)
+                try:
+                    self.cap = cv2.VideoCapture(self.url)
+                except Exception:
+                    pass
                 continue
-            ret, frame = self.cap.read()
-            if ret and frame is not None:
-                self.frame = frame
-                self.connected = True
-            else:
-                time.sleep(0.01)
+            try:
+                ret, frame = self.cap.read()
+                if ret and frame is not None:
+                    self.frame = frame
+                    self.connected = True
+                else:
+                    time.sleep(0.01)
+            except Exception:
+                break
 
     def read_latest(self):
         return self.frame
