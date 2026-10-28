@@ -36,15 +36,15 @@ class StreamWorker:
 
     def _reader_loop(self):
         while self.running:
-            if not self.cap.isOpened():
-                time.sleep(0.1)
-                try:
-                    self.cap = cv2.VideoCapture(self.url)
-                except Exception:
-                    pass
+            if not self.cap or not self.cap.isOpened():
+                time.sleep(0.05)
                 continue
             try:
+                if not self.running:
+                    break
                 ret, frame = self.cap.read()
+                if not self.running:
+                    break
                 if ret and frame is not None:
                     self.frame = frame
                     self.connected = True
@@ -58,8 +58,13 @@ class StreamWorker:
 
     def release(self):
         self.running = False
+        if hasattr(self, "thread") and self.thread.is_alive():
+            self.thread.join(timeout=0.5)
         if self.cap:
-            self.cap.release()
+            try:
+                self.cap.release()
+            except Exception:
+                pass
 
 
 def main():
