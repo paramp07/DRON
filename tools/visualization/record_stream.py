@@ -251,6 +251,7 @@ def main():
     file_cam1 = os.path.join(session_dir, "cam1.mp4")
     file_stereo = os.path.join(session_dir, "stereo.mp4")
     file_imu = os.path.join(session_dir, "imu.csv")
+    file_frame_timestamps = os.path.join(session_dir, "frame_timestamps.csv")
 
     out0 = cv2.VideoWriter(file_cam0, fourcc, args.fps, (w, h))
     out1 = cv2.VideoWriter(file_cam1, fourcc, args.fps, (w, h))
@@ -262,16 +263,19 @@ def main():
     print(f"=" * 70)
 
     start_time = time.time()
+    last_frame_time = start_time
     frame_interval = 1.0 / args.fps
     saved_frames = 0
+    frame_log = []
 
     try:
         while True:
-            elapsed = time.time() - start_time
+            now = time.time()
+            elapsed = now - start_time
             if elapsed >= args.seconds:
                 break
 
-            loop_start = time.time()
+            loop_start = now
             f0 = worker0.read_latest()
             f1 = worker1.read_latest()
 
@@ -281,6 +285,21 @@ def main():
                 if out_stereo:
                     sbs = np.hstack([f0, f1])
                     out_stereo.write(sbs)
+
+                imu_info = imu_worker.get_latest()
+                dt_frame = now - last_frame_time if saved_frames > 0 else 0.0
+                last_frame_time = now
+
+                frame_log.append({
+                    "frame_index": saved_frames,
+                    "timestamp_s": now,
+                    "elapsed_s": elapsed,
+                    "dt_s": dt_frame,
+                    "time_boot_ms": imu_info.get("time_boot_ms", 0),
+                    "roll_deg": imu_info.get("roll_deg", 0.0),
+                    "pitch_deg": imu_info.get("pitch_deg", 0.0),
+                    "yaw_deg": imu_info.get("yaw_deg", 0.0)
+                })
                 saved_frames += 1
 
             # Progress bar with live IMU attitude HUD
@@ -311,31 +330,55 @@ def main():
         worker1.release()
         imu_count = imu_worker.save_csv(file_imu)
 
+        # Save per-frame timestamps
+        with open(file_frame_timestamps, "w") as ftf:
+            ftf.write("frame_index,timestamp_s,elapsed_s,dt_s,time_boot_ms,roll_deg,pitch_deg,yaw_deg\n")
+            for fl in frame_log:
+                ftf.write(
+                    f"{fl['frame_index']},"
+                    f"{fl['timestamp_s']:.6f},"
+                    f"{fl['elapsed_s']:.4f},"
+                    f"{fl['dt_s']:.4f},"
+                    f"{fl['time_boot_ms']},"
+                    f"{fl['roll_deg']:.2f},"
+                    f"{fl['pitch_deg']:.2f},"
+                    f"{fl['yaw_deg']:.2f}\n"
+                )
+
+    end_time = time.time()
+
     # Save session metadata
     meta_path = os.path.join(session_dir, "metadata.json")
     try:
         with open(meta_path, "w") as mf:
             json.dump({
                 "timestamp": timestamp,
-                "duration_seconds": args.seconds,
-                "fps": args.fps,
+                "start_epoch_time": start_time,
+                "end_epoch_time": end_time,
+                "duration_requested_s": args.seconds,
+                "duration_actual_s": round(end_time - start_time, 3),
+                "fps_target": args.fps,
+                "fps_actual": round(saved_frames / max(1.0, end_time - start_time), 2),
                 "frame_count": saved_frames,
                 "resolution": {"width": w, "height": h},
                 "host": args.host,
                 "imu_samples_logged": imu_count,
-                "imu_rate_hz": round(imu_count / max(1.0, args.seconds), 1)
+                "imu_rate_hz": round(imu_count / max(1.0, end_time - start_time), 1),
+                "frame_timestamps_file": "frame_timestamps.csv",
+                "imu_telemetry_file": "imu.csv"
             }, mf, indent=2)
     except Exception:
         pass
 
     print(f"\n\n✅ RECORDING COMPLETE!")
     print(f"📁 Session Folder: {session_dir}")
-    print(f"  ▶ Camera 0:           {file_cam0}")
-    print(f"  ▶ Camera 1:           {file_cam1}")
+    print(f"  ▶ Camera 0:             {file_cam0}")
+    print(f"  ▶ Camera 1:             {file_cam1}")
     if args.side_by_side:
-        print(f"  ▶ Side-by-Side Stereo: {file_stereo}")
-    print(f"  ▶ Pixhawk IMU CSV:    {file_imu} ({imu_count} samples)")
-    print(f"  ▶ Session Metadata:   {meta_path}")
+        print(f"  ▶ Side-by-Side Stereo:   {file_stereo}")
+    print(f"  ▶ Per-Frame Timestamps: {file_frame_timestamps} ({len(frame_log)} frames)")
+    print(f"  ▶ Pixhawk IMU CSV:      {file_imu} ({imu_count} samples)")
+    print(f"  ▶ Session Metadata:     {meta_path}")
 
 
 if __name__ == "__main__":
