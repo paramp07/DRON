@@ -66,6 +66,9 @@ PAGE = """<!doctype html>
           document.getElementById('r-val').innerText = data.roll_deg.toFixed(1) + '°';
           document.getElementById('p-val').innerText = data.pitch_deg.toFixed(1) + '°';
           document.getElementById('y-val').innerText = data.yaw_deg.toFixed(1) + '°';
+          if (data.ax_m_s2 !== undefined) {
+            document.getElementById('acc-val').innerText = data.ax_m_s2.toFixed(2) + ', ' + data.ay_m_s2.toFixed(2) + ', ' + data.az_m_s2.toFixed(2) + ' m/s²';
+          }
           document.getElementById('imu-status').innerText = 'PIXHAWK CONNECTED (' + data.source + ')';
           document.getElementById('imu-status').style.background = '#10b981';
         } else {
@@ -85,6 +88,7 @@ PAGE = """<!doctype html>
     <div class="hud-item"><span class="hud-label">Roll (Bank)</span><span id="r-val" class="hud-val">0.0°</span></div>
     <div class="hud-item"><span class="hud-label">Pitch (Elevation)</span><span id="p-val" class="hud-val">0.0°</span></div>
     <div class="hud-item"><span class="hud-label">Yaw (Heading)</span><span id="y-val" class="hud-val">0.0°</span></div>
+    <div class="hud-item"><span class="hud-label">Accel (X/Y/Z)</span><span id="acc-val" class="hud-val">0.0, 0.0, 9.8 m/s²</span></div>
   </div>
   <div class="grid">__PANES__</div>
 </body>
@@ -125,11 +129,17 @@ class IMUState:
             "rollspeed_rad_s": 0.0,
             "pitchspeed_rad_s": 0.0,
             "yawspeed_rad_s": 0.0,
+            "ax_m_s2": 0.0,
+            "ay_m_s2": 0.0,
+            "az_m_s2": 0.0,
+            "gx_rad_s": 0.0,
+            "gy_rad_s": 0.0,
+            "gz_rad_s": 0.0,
             "timestamp_s": 0.0,
             "sample_count": 0
         }
 
-    def update(self, boot_ms, roll, pitch, yaw, r_spd, p_spd, y_spd, source):
+    def update_attitude(self, boot_ms, roll, pitch, yaw, r_spd, p_spd, y_spd, source):
         with self.lock:
             self.data["connected"] = True
             self.data["source"] = source
@@ -143,13 +153,30 @@ class IMUState:
             self.data["timestamp_s"] = time.time()
             self.data["sample_count"] += 1
 
+    def update_highres_imu(self, time_us, ax, ay, az, gx, gy, gz, source):
+        with self.lock:
+            self.data["connected"] = True
+            self.data["source"] = source
+            self.data["time_boot_ms"] = int(time_us // 1000)
+            self.data["ax_m_s2"] = ax
+            self.data["ay_m_s2"] = ay
+            self.data["az_m_s2"] = az
+            self.data["gx_rad_s"] = gx
+            self.data["gy_rad_s"] = gy
+            self.data["gz_rad_s"] = gz
+            self.data["timestamp_s"] = time.time()
+            self.data["sample_count"] += 1
+
+    def update(self, boot_ms, roll, pitch, yaw, r_spd, p_spd, y_spd, source):
+        self.update_attitude(boot_ms, roll, pitch, yaw, r_spd, p_spd, y_spd, source)
+
     def get_dict(self):
         with self.lock:
             return dict(self.data)
 
 
 def imu_reader_loop(imu_state, stop_event):
-    """Background thread reading MAVLink attitude telemetry from Pixhawk."""
+    """Background thread reading MAVLink attitude & IMU telemetry from Pixhawk."""
     candidate_ports = [
         "/dev/ttyACM1",
         "/dev/ttyACM0",
@@ -207,7 +234,10 @@ def imu_reader_loop(imu_state, stop_event):
                     checksum = ser.read(2)
                     if msg_id == 30 and len(payload) >= 28:  # ATTITUDE
                         t_boot, roll, pitch, yaw, r_spd, p_spd, y_spd = struct.unpack('<Iffffff', payload[:28])
-                        imu_state.update(t_boot, roll, pitch, yaw, r_spd, p_spd, y_spd, active_port)
+                        imu_state.update_attitude(t_boot, roll, pitch, yaw, r_spd, p_spd, y_spd, active_port)
+                    elif msg_id == 105 and len(payload) >= 32:  # HIGHRES_IMU (time_usec + ax,ay,az,gx,gy,gz)
+                        t_us, ax, ay, az, gx, gy, gz = struct.unpack('<Qffffff', payload[:32])
+                        imu_state.update_highres_imu(t_us, ax, ay, az, gx, gy, gz, active_port)
         except Exception:
             try:
                 ser.close()

@@ -86,6 +86,12 @@ class IMUWorker:
             "roll_deg": 0.0,
             "pitch_deg": 0.0,
             "yaw_deg": 0.0,
+            "ax_m_s2": 0.0,
+            "ay_m_s2": 0.0,
+            "az_m_s2": 0.0,
+            "gx_rad_s": 0.0,
+            "gy_rad_s": 0.0,
+            "gz_rad_s": 0.0,
             "connected": False
         }
         self.running = True
@@ -117,15 +123,50 @@ class IMUWorker:
                                     "yaw_deg": math.degrees(y),
                                     "rollspeed_rad_s": rs,
                                     "pitchspeed_rad_s": ps,
-                                    "yawspeed_rad_s": ys
+                                    "yawspeed_rad_s": ys,
+                                    "ax_m_s2": self.latest["ax_m_s2"],
+                                    "ay_m_s2": self.latest["ay_m_s2"],
+                                    "az_m_s2": self.latest["az_m_s2"],
+                                    "gx_rad_s": self.latest["gx_rad_s"],
+                                    "gy_rad_s": self.latest["gy_rad_s"],
+                                    "gz_rad_s": self.latest["gz_rad_s"]
                                 }
                                 self.records.append(rec)
-                                self.latest = {
+                                self.latest.update({
                                     "roll_deg": rec["roll_deg"],
                                     "pitch_deg": rec["pitch_deg"],
                                     "yaw_deg": rec["yaw_deg"],
                                     "connected": True
+                                })
+                            elif msg_id == 105 and len(payload) >= 32:
+                                t_us, ax, ay, az, gx, gy, gz = struct.unpack('<Qffffff', payload[:32])
+                                now = time.time()
+                                rec = {
+                                    "timestamp_s": now,
+                                    "time_boot_ms": int(t_us // 1000),
+                                    "roll_deg": self.latest["roll_deg"],
+                                    "pitch_deg": self.latest["pitch_deg"],
+                                    "yaw_deg": self.latest["yaw_deg"],
+                                    "rollspeed_rad_s": gx,
+                                    "pitchspeed_rad_s": gy,
+                                    "yawspeed_rad_s": gz,
+                                    "ax_m_s2": ax,
+                                    "ay_m_s2": ay,
+                                    "az_m_s2": az,
+                                    "gx_rad_s": gx,
+                                    "gy_rad_s": gy,
+                                    "gz_rad_s": gz
                                 }
+                                self.records.append(rec)
+                                self.latest.update({
+                                    "ax_m_s2": ax,
+                                    "ay_m_s2": ay,
+                                    "az_m_s2": az,
+                                    "gx_rad_s": gx,
+                                    "gy_rad_s": gy,
+                                    "gz_rad_s": gz,
+                                    "connected": True
+                                })
                 ser.close()
                 return
             except Exception as e:
@@ -149,6 +190,12 @@ class IMUWorker:
                                     "roll_deg": data.get("roll_deg", 0.0),
                                     "pitch_deg": data.get("pitch_deg", 0.0),
                                     "yaw_deg": data.get("yaw_deg", 0.0),
+                                    "ax_m_s2": data.get("ax_m_s2", 0.0),
+                                    "ay_m_s2": data.get("ay_m_s2", 0.0),
+                                    "az_m_s2": data.get("az_m_s2", 0.0),
+                                    "gx_rad_s": data.get("gx_rad_s", 0.0),
+                                    "gy_rad_s": data.get("gy_rad_s", 0.0),
+                                    "gz_rad_s": data.get("gz_rad_s", 0.0),
                                     "connected": True
                                 }
                     time.sleep(0.01)  # Poll at up to 100 Hz
@@ -164,7 +211,7 @@ class IMUWorker:
             self.thread.join(timeout=0.5)
 
         with open(filepath, "w") as f:
-            f.write("timestamp_s,time_boot_ms,roll_deg,pitch_deg,yaw_deg,rollspeed_rad_s,pitchspeed_rad_s,yawspeed_rad_s\n")
+            f.write("timestamp_s,time_boot_ms,roll_deg,pitch_deg,yaw_deg,rollspeed_rad_s,pitchspeed_rad_s,yawspeed_rad_s,ax_m_s2,ay_m_s2,az_m_s2,gx_rad_s,gy_rad_s,gz_rad_s\n")
             for r in self.records:
                 f.write(
                     f"{r.get('timestamp_s', 0):.4f},"
@@ -174,7 +221,13 @@ class IMUWorker:
                     f"{r.get('yaw_deg', 0.0):.2f},"
                     f"{r.get('rollspeed_rad_s', 0.0):.4f},"
                     f"{r.get('pitchspeed_rad_s', 0.0):.4f},"
-                    f"{r.get('yawspeed_rad_s', 0.0):.4f}\n"
+                    f"{r.get('yawspeed_rad_s', 0.0):.4f},"
+                    f"{r.get('ax_m_s2', 0.0):.4f},"
+                    f"{r.get('ay_m_s2', 0.0):.4f},"
+                    f"{r.get('az_m_s2', 0.0):.4f},"
+                    f"{r.get('gx_rad_s', 0.0):.4f},"
+                    f"{r.get('gy_rad_s', 0.0):.4f},"
+                    f"{r.get('gz_rad_s', 0.0):.4f}\n"
                 )
         return len(self.records)
 
@@ -298,7 +351,10 @@ def main():
                     "time_boot_ms": imu_info.get("time_boot_ms", 0),
                     "roll_deg": imu_info.get("roll_deg", 0.0),
                     "pitch_deg": imu_info.get("pitch_deg", 0.0),
-                    "yaw_deg": imu_info.get("yaw_deg", 0.0)
+                    "yaw_deg": imu_info.get("yaw_deg", 0.0),
+                    "ax_m_s2": imu_info.get("ax_m_s2", 0.0),
+                    "ay_m_s2": imu_info.get("ay_m_s2", 0.0),
+                    "az_m_s2": imu_info.get("az_m_s2", 0.0)
                 })
                 saved_frames += 1
 
@@ -310,7 +366,7 @@ def main():
 
             imu_info = imu_worker.get_latest()
             if imu_info["connected"]:
-                hud = f"IMU: R:{imu_info['roll_deg']:+5.1f}° P:{imu_info['pitch_deg']:+5.1f}° Y:{imu_info['yaw_deg']:5.1f}°"
+                hud = f"IMU: R:{imu_info['roll_deg']:+5.1f}° P:{imu_info['pitch_deg']:+5.1f}° Y:{imu_info['yaw_deg']:5.1f}° | Az:{imu_info.get('az_m_s2', 0.0):+4.1f}m/s²"
             else:
                 hud = "IMU: Waiting..."
 
@@ -332,7 +388,7 @@ def main():
 
         # Save per-frame timestamps
         with open(file_frame_timestamps, "w") as ftf:
-            ftf.write("frame_index,timestamp_s,elapsed_s,dt_s,time_boot_ms,roll_deg,pitch_deg,yaw_deg\n")
+            ftf.write("frame_index,timestamp_s,elapsed_s,dt_s,time_boot_ms,roll_deg,pitch_deg,yaw_deg,ax_m_s2,ay_m_s2,az_m_s2\n")
             for fl in frame_log:
                 ftf.write(
                     f"{fl['frame_index']},"
@@ -342,7 +398,10 @@ def main():
                     f"{fl['time_boot_ms']},"
                     f"{fl['roll_deg']:.2f},"
                     f"{fl['pitch_deg']:.2f},"
-                    f"{fl['yaw_deg']:.2f}\n"
+                    f"{fl['yaw_deg']:.2f},"
+                    f"{fl.get('ax_m_s2', 0.0):.3f},"
+                    f"{fl.get('ay_m_s2', 0.0):.3f},"
+                    f"{fl.get('az_m_s2', 0.0):.3f}\n"
                 )
 
     end_time = time.time()
