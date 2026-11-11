@@ -233,8 +233,16 @@ class IMUWorker:
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
     parser = argparse.ArgumentParser(description="Record live camera streams & IMU from Raspberry Pi")
     parser.add_argument("-s", "--seconds", type=float, default=10.0, help="Duration in seconds (default: 10.0)")
+    parser.add_argument("-m", "--manual", action="store_true", default=False,
+                        help="Manual start/stop mode: Press ENTER to start, and ENTER or Ctrl+C to stop")
     parser.add_argument("--host", default="raspberrypi.local", help="Host IP or hostname (default: raspberrypi.local)")
     parser.add_argument("--port", type=int, default=8000, help="HTTP Port (default: 8000)")
     parser.add_argument("--fps", type=float, default=25.0, help="Recording FPS (default: 25.0)")
@@ -310,10 +318,37 @@ def main():
     out1 = cv2.VideoWriter(file_cam1, fourcc, args.fps, (w, h))
     out_stereo = cv2.VideoWriter(file_stereo, fourcc, args.fps, (w * 2, h)) if args.side_by_side else None
 
+    if args.manual:
+        print("\n" + "=" * 70)
+        print("🟢 CAMERA STREAMS & PIXHAWK IMU CONNECTED!")
+        print("👉 Press [ENTER] to START recording...")
+        print("=" * 70)
+        try:
+            input()
+        except (KeyboardInterrupt, EOFError):
+            worker0.release()
+            worker1.release()
+            imu_worker.running = False
+            sys.exit(0)
+
     print(f"\n" + "=" * 70)
-    print(f"🎬 RECORDING STARTED: {args.seconds}s @ {args.fps} FPS + Pixhawk IMU")
+    if args.manual:
+        print(f"🎬 RECORDING STARTED (MANUAL MODE @ {args.fps} FPS + Pixhawk IMU)")
+        print("👉 Press [ENTER] or Ctrl+C at any time to STOP recording and save.")
+    else:
+        print(f"🎬 RECORDING STARTED: {args.seconds}s @ {args.fps} FPS + Pixhawk IMU")
     print(f"📁 Saving to: {session_dir}")
     print(f"=" * 70)
+
+    stop_event = threading.Event()
+    if args.manual:
+        def wait_for_stop():
+            try:
+                input()
+            except Exception:
+                pass
+            stop_event.set()
+        threading.Thread(target=wait_for_stop, daemon=True).start()
 
     start_time = time.time()
     last_frame_time = start_time
@@ -325,8 +360,12 @@ def main():
         while True:
             now = time.time()
             elapsed = now - start_time
-            if elapsed >= args.seconds:
-                break
+            if args.manual:
+                if stop_event.is_set():
+                    break
+            else:
+                if elapsed >= args.seconds:
+                    break
 
             loop_start = now
             f0 = worker0.read_latest()
@@ -359,18 +398,22 @@ def main():
                 saved_frames += 1
 
             # Progress bar with live IMU attitude HUD
-            progress = min(1.0, elapsed / args.seconds)
-            bar_len = 20
-            filled = int(bar_len * progress)
-            bar = "█" * filled + "░" * (bar_len - filled)
-
             imu_info = imu_worker.get_latest()
             if imu_info["connected"]:
                 hud = f"IMU: R:{imu_info['roll_deg']:+5.1f}° P:{imu_info['pitch_deg']:+5.1f}° Y:{imu_info['yaw_deg']:5.1f}° | Az:{imu_info.get('az_m_s2', 0.0):+4.1f}m/s²"
             else:
                 hud = "IMU: Waiting..."
 
-            sys.stdout.write(f"\r[{bar}] {elapsed:4.1f}s / {args.seconds:.1f}s | {saved_frames:3d} frames | {hud}")
+            if args.manual:
+                hud_line = f"\r[REC 🔴] {elapsed:5.1f}s | {saved_frames:3d} frames | {hud} | Press ENTER to STOP"
+            else:
+                progress = min(1.0, elapsed / args.seconds)
+                bar_len = 20
+                filled = int(bar_len * progress)
+                bar = "█" * filled + "░" * (bar_len - filled)
+                hud_line = f"\r[{bar}] {elapsed:4.1f}s / {args.seconds:.1f}s | {saved_frames:3d} frames | {hud}"
+
+            sys.stdout.write(hud_line)
             sys.stdout.flush()
 
             dt = time.time() - loop_start
